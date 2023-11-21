@@ -3,6 +3,7 @@ package com.marduc812;
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.logging.Logging;
 import burp.api.montoya.proxy.*;
+import burp.api.montoya.scope.Scope;
 
 import java.net.URL;
 import java.util.*;
@@ -13,10 +14,12 @@ public class HistoryExplorer {
 
     static Logging logging;
     HistoryExplorerGui gui;
+    static Scope scope;
 
-    public HistoryExplorer(MontoyaApi api, HistoryExplorerGui gui, String searchTerm, boolean regExSearch ,boolean[] searchStatusCodes, String includedExtensionsString, String excludedExtensionsString) {
+    public HistoryExplorer(MontoyaApi api, HistoryExplorerGui gui, String searchTerm, boolean regExSearch, boolean inScopeSearch ,boolean[] searchStatusCodes, String includedExtensionsString, String excludedExtensionsString) {
 
         logging = api.logging();
+        scope = api.scope();
         this.gui = gui;
 
         if (searchTerm == null || searchTerm.isEmpty()) {
@@ -66,22 +69,31 @@ public class HistoryExplorer {
                     return;
                 }
 
+                // If inScopeSearch is enabled, ignore items which are not in scope
+                logging.logToOutput(String.valueOf(inScopeSearch));
+                if (inScopeSearch) {
+                    if (!scope.isInScope(item.url())) {
+                        return;
+                    }
+                }
+
+                // Get the file extension
                 String requestExtensionStr = String.valueOf(getExtensionFromPath(item.path()));
 
-
+                // Ignore if the request URL is in the excluded type of extension
                 if (excludedExtensions.length > 0 && requestExtensionStr != null && Arrays.asList(excludedExtensions).contains(requestExtensionStr)) {
                     return;
                 }
 
-
+                // Ignore if the request URL is in not the included type of extension
                 if (includedExtensions.length > 0 && requestExtensionStr != null && !Arrays.asList(includedExtensions).contains(requestExtensionStr)) {
                     return;
                 }
 
                 String matchingValue = null;
 
+                // Search using RegEx or Literal String
                 if (regExSearch) {
-                    // regex search
                     Matcher matcherRes = pattern.matcher(item.originalResponse().toString());
                     if (matcherRes.find()) {
                         matchingValue = matcherRes.group();

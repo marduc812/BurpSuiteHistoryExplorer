@@ -10,6 +10,7 @@ During a large assessment I conducted, I wanted a clear view of which servers we
 - Include or exclude file extensions in your search. Use the keyword `none` for requests without an extension.
 - Results can be copied directly from the table using the standard `ctrl + c` combination.
 - If multiple results occur on the same host, the values are separated by `||`.
+- Filter only for in-scope items
 
 ## Screenshot
 

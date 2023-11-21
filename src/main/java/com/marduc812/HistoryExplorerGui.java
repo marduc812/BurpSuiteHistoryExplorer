@@ -21,6 +21,7 @@ public class HistoryExplorerGui extends JPanel {
     private final JCheckBox fourHunCheckBox;
     private final JCheckBox fiveHunCheckBox;
     private final JCheckBox regExCheckBox;
+    private final JCheckBox inScopeFilterBox;
     private final JTextField includeExtensionsinput;
     private final JTextField excludeExtensionsinput;
 
@@ -62,16 +63,18 @@ public class HistoryExplorerGui extends JPanel {
                 String userInput = searchInput.getText();
                 boolean[] checkboxStates = getCheckboxStates();
                 boolean regExSearch = regExCheckBox.isSelected();
+                boolean inScopeSearch = inScopeFilterBox.isSelected();
                 String includedExtensions = includeExtensionsinput.getText();
                 String excludeExtensions = excludeExtensionsinput.getText();
                 // Arguments:
                 // api: burp api
                 // userInput: text types by user
                 // regExSearch: text or regex search
+                // inScopeSearch: search only for items in scope
                 // checkboxStates: Status code response: 200,300,400,500
                 // includedExtensions: extensions to include
                 // excludedExtensions: extensions to exclude
-                new HistoryExplorer(api, HistoryExplorerGui.this, userInput, regExSearch, checkboxStates, includedExtensions, excludeExtensions);
+                new HistoryExplorer(api, HistoryExplorerGui.this, userInput, regExSearch, inScopeSearch, checkboxStates, includedExtensions, excludeExtensions);
             }
         });
 
@@ -79,10 +82,14 @@ public class HistoryExplorerGui extends JPanel {
         searchInputPanel.add(searchBtn);
 
 
-        // REGEX LAYOUT
+        // REGEX LAYOUT & SCOPE FILTER
         JPanel regexOptionsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 5));
         regExCheckBox = new JCheckBox("RegEx Search");
+        inScopeFilterBox = new JCheckBox("Only In-Scope");
+
         regexOptionsPanel.add(regExCheckBox);
+        regexOptionsPanel.add(inScopeFilterBox);
+
 
         // STATUS RESPONSE CODES LAYOUT
         JPanel searchOptionsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 5));
