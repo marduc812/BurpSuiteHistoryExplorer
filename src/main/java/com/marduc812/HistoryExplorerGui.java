@@ -11,8 +11,10 @@ import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.List;
 
 public class HistoryExplorerGui extends JPanel {
 
@@ -22,10 +24,13 @@ public class HistoryExplorerGui extends JPanel {
     private final JCheckBox fiveHunCheckBox;
     private final JCheckBox regExCheckBox;
     private final JCheckBox inScopeFilterBox;
+    private final JCheckBox requestBox;
+    private final JCheckBox responseBox;
     private final JTextField includeExtensionsinput;
     private final JTextField excludeExtensionsinput;
-
     private final DefaultTableModel tableModel;
+    private final JButton searchBtn;
+    private final JTextField searchInput;
 
     public HistoryExplorerGui(MontoyaApi api) {
 
@@ -46,8 +51,8 @@ public class HistoryExplorerGui extends JPanel {
 
         // MAIN SEARCH
         JPanel searchInputPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 5));
-        JTextField searchInput = new JTextField("");
-        JButton searchBtn = new JButton("Search");
+        searchInput = new JTextField("");
+        searchBtn = new JButton("Search");
 
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
         int width = (int) (screenSize.width * 0.3); // 30% of screen width
@@ -64,17 +69,19 @@ public class HistoryExplorerGui extends JPanel {
                 boolean[] checkboxStates = getCheckboxStates();
                 boolean regExSearch = regExCheckBox.isSelected();
                 boolean inScopeSearch = inScopeFilterBox.isSelected();
+
+
+                boolean reqSearch = requestBox.isSelected();
+                boolean resSearch = responseBox.isSelected();
+                List<Boolean> httpOptions = new ArrayList<>();
+                httpOptions.add(reqSearch);
+                httpOptions.add(resSearch);
+
                 String includedExtensions = includeExtensionsinput.getText();
                 String excludeExtensions = excludeExtensionsinput.getText();
-                // Arguments:
-                // api: burp api
-                // userInput: text types by user
-                // regExSearch: text or regex search
-                // inScopeSearch: search only for items in scope
-                // checkboxStates: Status code response: 200,300,400,500
-                // includedExtensions: extensions to include
-                // excludedExtensions: extensions to exclude
-                new HistoryExplorer(api, HistoryExplorerGui.this, userInput, regExSearch, inScopeSearch, checkboxStates, includedExtensions, excludeExtensions);
+                disableSearchButton();
+
+                new HistoryExplorer(api, HistoryExplorerGui.this, userInput, regExSearch, inScopeSearch, checkboxStates, includedExtensions, excludeExtensions, httpOptions);
             }
         });
 
@@ -90,6 +97,16 @@ public class HistoryExplorerGui extends JPanel {
         regexOptionsPanel.add(regExCheckBox);
         regexOptionsPanel.add(inScopeFilterBox);
 
+
+        // HTTP options FILTER
+        JPanel httpOptionsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 5));
+        JLabel filterHTTPLabel = new JLabel("Filter HTTP: ");
+        requestBox = new JCheckBox("Requests");
+        responseBox = new JCheckBox("Responses", true);
+
+        httpOptionsPanel.add(filterHTTPLabel);
+        httpOptionsPanel.add(requestBox);
+        httpOptionsPanel.add(responseBox);
 
         // STATUS RESPONSE CODES LAYOUT
         JPanel searchOptionsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 5));
@@ -143,7 +160,6 @@ public class HistoryExplorerGui extends JPanel {
 
 
         // OUTPUT
-
         JPanel outputPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 5));
 
         String[] columnNames = {"Host", "Output"};
@@ -174,6 +190,7 @@ public class HistoryExplorerGui extends JPanel {
         searchInputPanel.setMaximumSize(searchInputPanel.getPreferredSize());
         regexOptionsPanel.setMaximumSize(regexOptionsPanel.getPreferredSize());
         searchOptionsPanel.setMaximumSize(searchOptionsPanel.getPreferredSize());
+        httpOptionsPanel.setMaximumSize(searchOptionsPanel.getPreferredSize());
         searchExtensionPanel.setMaximumSize(searchExtensionPanel.getPreferredSize());
 
         // ADD EVERY VIEW
@@ -181,12 +198,29 @@ public class HistoryExplorerGui extends JPanel {
         // Create the box layout
         mainPanel.add(searchInputPanel);
         mainPanel.add(regexOptionsPanel);
+        mainPanel.add(httpOptionsPanel);
         mainPanel.add(searchOptionsPanel);
         mainPanel.add(searchExtensionPanel);
 
         // Add every view
         add(mainPanel);
         add(outputPanel);
+    }
+
+    // Make the button available when not searching
+    public void enableSearchButton() {
+        java.awt.EventQueue.invokeLater(() -> {
+            searchInput.setEnabled(true);
+            searchBtn.setEnabled(true);
+        });
+    }
+
+    // Searching, the button is disabled
+    public void disableSearchButton() {
+        java.awt.EventQueue.invokeLater(() -> {
+            searchInput.setEnabled(false);
+            searchBtn.setEnabled(false);
+        });
     }
 
     private boolean[] getCheckboxStates() {
