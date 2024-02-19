@@ -22,7 +22,7 @@ Literal string search for nginx, and exclusion of requests with no extension, js
 
 ## Changelog
 
-- v1.1 (19/02/2024)
+- v1.2 (19/02/2024)
   - Improved memory usage
   - Multithreaded execution
   - Option to filter in Requests or Responses only
