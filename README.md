@@ -20,6 +20,14 @@ Searching with regex for the Server header.
 ![Literal string search for nginx, and exclusion of requests with no extension, js, php, and css.](./Images/literal-search.png)
 Literal string search for nginx, and exclusion of requests with no extension, js, php, and css.
 
+## Changelog
+
+- v1.2 (19/02/2024)
+  - Improved memory usage
+  - Multithreaded execution
+  - Option to filter in Requests or Responses only
+  - Improved regex parsing
+
 ## Development
 
 For bugs and feature ideas open an issue here.  
