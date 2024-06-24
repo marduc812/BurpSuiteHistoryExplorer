@@ -22,6 +22,11 @@ Literal string search for nginx, and exclusion of requests with no extension, js
 
 ## Changelog
 
+
+- V1.3 (24/06/2024)
+  - Option to stop the search
+  - Option to also filter by protocol and port in the "Host" column of the results
+
 - v1.2 (19/02/2024)
   - Improved memory usage
   - Multithreaded execution

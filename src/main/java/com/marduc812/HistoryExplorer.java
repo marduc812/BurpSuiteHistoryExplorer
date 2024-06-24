@@ -4,6 +4,9 @@ import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.logging.Logging;
 import burp.api.montoya.proxy.*;
 import burp.api.montoya.scope.Scope;
+
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -15,8 +18,9 @@ public class HistoryExplorer {
     HistoryExplorerGui gui;
     static Scope scope;
     private ExecutorService executorService;
+    private volatile boolean stopSearchFlag;
 
-    public HistoryExplorer(MontoyaApi api, HistoryExplorerGui gui, String searchTerm, boolean regExSearch, boolean inScopeSearch ,boolean[] searchStatusCodes, String includedExtensionsString, String excludedExtensionsString, List<Boolean> httpOptions) {
+    public HistoryExplorer(MontoyaApi api, HistoryExplorerGui gui, String searchTerm, boolean regExSearch, boolean inScopeSearch ,boolean[] searchStatusCodes, boolean showProtocol, boolean showPort, String includedExtensionsString, String excludedExtensionsString, List<Boolean> httpOptions) {
 
         logging = api.logging();
         scope = api.scope();
@@ -28,6 +32,7 @@ public class HistoryExplorer {
 
         if (searchTerm == null || searchTerm.isEmpty()) {
             logging.logToOutput("Empty search string");
+            gui.enableSearchButton();
             return;
         }
 
@@ -51,6 +56,8 @@ public class HistoryExplorer {
 
         // all request filters are disabled
         if (statusFilters.isEmpty()) {
+            logging.logToOutput("At least one of the Request Response options should be enabled");
+            gui.enableSearchButton();
             return;
         }
 
@@ -62,11 +69,15 @@ public class HistoryExplorer {
 
         this.executorService = Executors.newFixedThreadPool(4);
         executorService.submit(() -> {
-            processHttpHistory(api, gui, searchTerm, regExSearch, inScopeSearch, searchStatusCodes, includedExtensions, excludedExtensions, httpOptions);
+            processHttpHistory(api, gui, searchTerm, regExSearch, inScopeSearch, searchStatusCodes, showProtocol, showPort, includedExtensions, excludedExtensions, httpOptions);
         });
     }
 
-    private void processHttpHistory(MontoyaApi api, HistoryExplorerGui gui, String searchTerm, boolean regExSearch, boolean inScopeSearch, boolean[] searchStatusCodes, String[] includedExtensions, String[] excludedExtensions, List<Boolean> httpOptions) {
+    public void stopSearch() {
+        stopSearchFlag = true;
+    }
+
+    private void processHttpHistory(MontoyaApi api, HistoryExplorerGui gui, String searchTerm, boolean regExSearch, boolean inScopeSearch, boolean[] searchStatusCodes, Boolean showProtocol, Boolean showPort, String[] includedExtensions, String[] excludedExtensions, List<Boolean> httpOptions) {
 
         List<String> statusFilters = getStatusFilters(searchStatusCodes);
         FilterHTTPResults filterHTTP = new FilterHTTPResults(searchTerm);
@@ -78,81 +89,108 @@ public class HistoryExplorer {
 
         logging.logToOutput("#############\nRecords returned: " + httpHistory.size() + "\n##########\n");
 
-        httpHistory.forEach(item -> {
-            /// Check for null values
-        if (item.originalResponse() != null && item.finalRequest() != null) {
 
-            // If the status code is not selected ignore it
-            if (!statusFilters.contains(String.valueOf(item.originalResponse().statusCode()).substring(0, 1))) {
-                return;
+        for (ProxyHttpRequestResponse item : httpHistory) {
+
+            if (stopSearchFlag) {
+                logging.logToOutput("Search stopped by user.");
+                break;
             }
 
-            // If inScopeSearch is enabled, ignore items which are not in scope
-            if (inScopeSearch) {
-                if (!scope.isInScope(item.url())) {
+            if (item.originalResponse() != null && item.finalRequest() != null) {
+
+                if (!statusFilters.contains(String.valueOf(item.originalResponse().statusCode()).substring(0, 1))) {
                     return;
                 }
-            }
 
-            // Get the file extension
-            String requestExtensionStr = String.valueOf(getExtensionFromPath(item.path()));
-
-            // Ignore if the request URL is in the excluded type of extension
-            if (excludedExtensions.length > 0 && requestExtensionStr != null && Arrays.asList(excludedExtensions).contains(requestExtensionStr)) {
-                return;
-            }
-
-            // Ignore if the request URL is in not the included type of extension
-            if (includedExtensions.length > 0 && requestExtensionStr != null && !Arrays.asList(includedExtensions).contains(requestExtensionStr)) {
-                return;
-            }
-
-            List<String> matchingValues = new ArrayList<>();
-
-            // Search using RegEx or Literal String
-            if (regExSearch) {
-                // Check in the request
-                if (reqFilter) {
-                    Matcher requestMatcher = pattern.matcher(item.finalRequest().toString());
-                    while (requestMatcher.find()) {
-                        matchingValues.add(requestMatcher.group());
+                if (inScopeSearch) {
+                    if (!scope.isInScope(item.url())) {
+                        return;
                     }
                 }
 
-                // Check in the response
-                if (resFilter) {
-                    Matcher responseMatcher = pattern.matcher(item.originalResponse().toString());
-                    while (responseMatcher.find()) {
-                        matchingValues.add(responseMatcher.group());
+                String requestExtensionStr = String.valueOf(getExtensionFromPath(item.path()));
+
+                if (excludedExtensions.length > 0 && requestExtensionStr != null && Arrays.asList(excludedExtensions).contains(requestExtensionStr)) {
+                    return;
+                }
+
+                if (includedExtensions.length > 0 && requestExtensionStr != null && !Arrays.asList(includedExtensions).contains(requestExtensionStr)) {
+                    return;
+                }
+
+                List<String> matchingValues = new ArrayList<>();
+
+                if (regExSearch) {
+                    if (reqFilter) {
+                        Matcher requestMatcher = pattern.matcher(item.finalRequest().toString());
+                        while (requestMatcher.find()) {
+                            matchingValues.add(requestMatcher.group());
+                        }
+                    }
+
+                    if (resFilter) {
+                        Matcher responseMatcher = pattern.matcher(item.originalResponse().toString());
+                        while (responseMatcher.find()) {
+                            matchingValues.add(responseMatcher.group());
+                        }
+                    }
+                } else {
+                    if (reqFilter) {
+                        String request = item.finalRequest().toString();
+                        if (request.contains(searchTerm)) {
+                            matchingValues.add(searchTerm);
+                        }
+                    }
+                    if (resFilter) {
+                        String response = item.originalResponse().toString();
+                        if (response.contains(searchTerm)) {
+                            matchingValues.add(searchTerm);
+                        }
                     }
                 }
-            } else {
-                // not a regex search
-                if (reqFilter){
-                    String request = item.finalRequest().toString();
-                    if (request.contains(searchTerm)) {
-                        matchingValues.add(searchTerm);
+
+                if (!matchingValues.isEmpty()) {
+                    Set<String> uniqueMatchingValues = new HashSet<>(matchingValues);
+
+                    String urlString = item.url();
+                    String protocol = "";
+                    String host = item.host();
+                    int port = -1;
+
+                    try {
+                        URL url = new URL(urlString);
+                        protocol = url.getProtocol();
+                        port = url.getPort();
+                    } catch (MalformedURLException e) {
+                        logging.logToError("Error parsing URL: " + e.getMessage());
                     }
-                }
-                if (resFilter) {
-                    String response = item.originalResponse().toString();
-                    if (response.contains(searchTerm)) {
-                        matchingValues.add(searchTerm);
+
+                    StringBuilder hostBuilder = new StringBuilder();
+                    if (showProtocol) {
+                        hostBuilder.append(protocol).append("://");
                     }
+                    hostBuilder.append(host);
+                    if (showPort) {
+                        if (port == -1) {
+                            if ("http".equalsIgnoreCase(protocol)) {
+                                port = 80;
+                            } else if ("https".equalsIgnoreCase(protocol)) {
+                                port = 443;
+                            }
+                        }
+                        hostBuilder.append(":").append(port);
+                    }
+
+
+                    String hostString = hostBuilder.toString();
+                    hostToServersMap.putIfAbsent(hostString, new HashSet<>());
+
+                    Set<String> matchesForHost = hostToServersMap.get(hostString);
+                    matchesForHost.addAll(uniqueMatchingValues);
                 }
             }
-
-            if (!matchingValues.isEmpty()) {
-                Set<String> uniqueMatchingValues = new HashSet<>(matchingValues);
-
-                String host = item.host();
-                hostToServersMap.putIfAbsent(host, new HashSet<>());
-
-                Set<String> matchesForHost = hostToServersMap.get(host);
-                matchesForHost.addAll(uniqueMatchingValues);
-            }
-        }
-    });
+        };
 
         httpHistory.clear();
         httpHistory = null;
@@ -165,12 +203,13 @@ public class HistoryExplorer {
             newData.put(host, parsedString);
         });
 
-        // update the GUI
         java.awt.EventQueue.invokeLater(() -> {
             gui.enableSearchButton();
             gui.updateTableData(newData);
         });
     }
+
+
 
 
     private List<String> getStatusFilters(boolean[] statusFilter) {
@@ -212,4 +251,8 @@ public class HistoryExplorer {
         }
         return "none";
     }
+
+
 }
+
+

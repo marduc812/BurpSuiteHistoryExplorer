@@ -28,14 +28,17 @@ public class HistoryExplorerGui extends JPanel {
     private final JCheckBox responseBox;
     private final JTextField includeExtensionsinput;
     private final JTextField excludeExtensionsinput;
+    private final JCheckBox showProtocolCheckBox;
+    private final JCheckBox showPortCheckBox;
     private final DefaultTableModel tableModel;
     private final JButton searchBtn;
     private final JTextField searchInput;
 
+    private  HistoryExplorer historyExplorer;
+
     public HistoryExplorerGui(MontoyaApi api) {
 
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
-
 
         // BORDER VIEW
         Border roundedLineBorder = new javax.swing.border.LineBorder(Color.BLACK, 1, true);
@@ -65,25 +68,39 @@ public class HistoryExplorerGui extends JPanel {
         searchBtn.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                String userInput = searchInput.getText();
-                boolean[] checkboxStates = getCheckboxStates();
-                boolean regExSearch = regExCheckBox.isSelected();
-                boolean inScopeSearch = inScopeFilterBox.isSelected();
+                if ("Search".equals(searchBtn.getText())) {
+                    // Start the search
+                    searchBtn.setText("Stop");
+                    searchInput.setEnabled(false);
 
+                    // Collect search parameters and start a new HistoryExplorer
+                    String userInput = searchInput.getText();
+                    boolean[] checkboxStates = getCheckboxStates();
+                    boolean regExSearch = regExCheckBox.isSelected();
+                    boolean inScopeSearch = inScopeFilterBox.isSelected();
+                    boolean showProt = showProtocolCheckBox.isSelected();
+                    boolean showPort = showPortCheckBox.isSelected();
+                    boolean reqSearch = requestBox.isSelected();
+                    boolean resSearch = responseBox.isSelected();
+                    List<Boolean> httpOptions = new ArrayList<>();
+                    httpOptions.add(reqSearch);
+                    httpOptions.add(resSearch);
+                    String includedExtensions = includeExtensionsinput.getText();
+                    String excludeExtensions = excludeExtensionsinput.getText();
 
-                boolean reqSearch = requestBox.isSelected();
-                boolean resSearch = responseBox.isSelected();
-                List<Boolean> httpOptions = new ArrayList<>();
-                httpOptions.add(reqSearch);
-                httpOptions.add(resSearch);
-
-                String includedExtensions = includeExtensionsinput.getText();
-                String excludeExtensions = excludeExtensionsinput.getText();
-                disableSearchButton();
-
-                new HistoryExplorer(api, HistoryExplorerGui.this, userInput, regExSearch, inScopeSearch, checkboxStates, includedExtensions, excludeExtensions, httpOptions);
+                    historyExplorer = new HistoryExplorer(api, HistoryExplorerGui.this, userInput, regExSearch, inScopeSearch, checkboxStates, showProt, showPort, includedExtensions, excludeExtensions, httpOptions);
+                } else {
+                    // Stop the search
+                    searchBtn.setText("Search");
+                    searchInput.setEnabled(true);
+                    if (historyExplorer != null) {
+                        historyExplorer.stopSearch();
+                        stopSearch(); // update gui
+                    }
+                }
             }
         });
+
 
         searchInputPanel.add(searchInput);
         searchInputPanel.add(searchBtn);
@@ -159,6 +176,18 @@ public class HistoryExplorerGui extends JPanel {
         searchExtensionPanel.add(helpBtn);
 
 
+        // Host column view layout
+        JPanel hostColPrefsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 5));
+
+        JLabel showProtocolLabel = new JLabel("Host filtering: ");
+
+        showProtocolCheckBox = new JCheckBox("Protocol", true);
+        showPortCheckBox = new JCheckBox("Port", true);
+
+        hostColPrefsPanel.add(showProtocolLabel);
+        hostColPrefsPanel.add(showProtocolCheckBox);
+        hostColPrefsPanel.add(showPortCheckBox);
+
         // OUTPUT
         JPanel outputPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 5));
 
@@ -200,7 +229,9 @@ public class HistoryExplorerGui extends JPanel {
         mainPanel.add(regexOptionsPanel);
         mainPanel.add(httpOptionsPanel);
         mainPanel.add(searchOptionsPanel);
+        mainPanel.add(hostColPrefsPanel);
         mainPanel.add(searchExtensionPanel);
+
 
         // Add every view
         add(mainPanel);
@@ -211,17 +242,37 @@ public class HistoryExplorerGui extends JPanel {
     public void enableSearchButton() {
         java.awt.EventQueue.invokeLater(() -> {
             searchInput.setEnabled(true);
-            searchBtn.setEnabled(true);
+            searchBtn.setText("Search");
         });
     }
 
-    // Searching, the button is disabled
-    public void disableSearchButton() {
-        java.awt.EventQueue.invokeLater(() -> {
-            searchInput.setEnabled(false);
+    public void stopSearch() {
+        SwingUtilities.invokeLater(() -> {
             searchBtn.setEnabled(false);
+            searchInput.setEnabled(false);
+            searchBtn.setText("Stopping...");
+
+            if (historyExplorer != null) {
+                historyExplorer.stopSearch();
+            }
+
+            Timer timer = new Timer(2000, new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    SwingUtilities.invokeLater(() -> {
+                        searchBtn.setEnabled(true);
+                        searchBtn.setText("Search");
+                        searchInput.setEnabled(true);
+                    });
+                }
+            });
+            timer.setRepeats(false);
+            timer.start();
         });
     }
+
+
+
 
     private boolean[] getCheckboxStates() {
         return new boolean[]{
